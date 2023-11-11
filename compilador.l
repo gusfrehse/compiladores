@@ -38,6 +38,10 @@ numero [0-9]+
 
 comentario "(*".*"*)"
 
+tipo (integer|boolean)
+
+boolean (True|False)
+
 %%
 
 {pulo_linha} {nl++;}
@@ -119,5 +123,198 @@ end { simbolo = simb_end;
           return IDENT;
         }
 
+label { simbolo = simb_label;
+		strncpy (token, yytext, TAM_TOKEN);
+		IMPRIME(" label  ");
+		return LABEL;
+	  }
+
+type	{ simbolo = simb_type;
+		  strncpy (token, yytext, TAM_TOKEN);
+		  IMPRIME(" type  ");
+		  return TYPE;
+		}
+
+procedure	{ simbolo = simb_procedure;
+		      strncpy (token, yytext, TAM_TOKEN);
+		      IMPRIME(" procedure  ");
+		      return PROCEDURE;
+		}
+
+function { simbolo = simb_function;
+		   strncpy (token, yytext, TAM_TOKEN);
+		   IMPRIME(" function  ");
+		   return FUNCTION;
+		 }
+
+goto { simbolo = simb_goto;
+	   strncpy (token, yytext, TAM_TOKEN);
+	   IMPRIME(" goto  ");
+	   return GOTO;
+	 }
+
+if 	{ simbolo = simb_if;
+	  strncpy (token, yytext, TAM_TOKEN);
+	  IMPRIME(" if  ");
+	  return IF;
+	}
+
+then	{ simbolo = simb_then;
+		  strncpy (token, yytext, TAM_TOKEN);
+		  IMPRIME(" then  ");
+		  return THEN;
+		}
+
+else	{ simbolo = simb_else;
+		  strncpy (token, yytext, TAM_TOKEN);
+		  IMPRIME(" else  ");
+		  return ELSE;
+		}
+
+while	{ simbolo = simb_while;
+		  strncpy (token, yytext, TAM_TOKEN);
+		  IMPRIME(" while  ");
+		  return WHILE;
+		}
+
+do	    { simbolo = simb_do;
+		  strncpy (token, yytext, TAM_TOKEN);
+		  IMPRIME(" do  ");
+		  return DO;
+		}
+
+array	{ simbolo = simb_array;
+		  strncpy (token, yytext, TAM_TOKEN);
+		  IMPRIME(" array  ");
+		  return ARRAY;
+		}
+
+of	{ simbolo = simb_of;
+	  strncpy (token, yytext, TAM_TOKEN);
+		IMPRIME(" of  ");
+		return OF;
+	}
+
+\[	{ simbolo = simb_abre_colchetes;
+	  strncpy (token, yytext, TAM_TOKEN);
+	  IMPRIME(" abre colchetes  ");
+	  return ABRE_COLCHETES;
+	}
+
+\]	{ simbolo = simb_fecha_colchetes;
+	  strncpy (token, yytext, TAM_TOKEN);
+	  IMPRIME(" fecha colchetes  ");
+	  return FECHA_COLCHETES;
+	}
+
+div { simbolo = simb_div;
+	  strncpy (token, yytext, TAM_TOKEN);
+	  IMPRIME(" div  ");
+	  return DIV;
+	}
+
+and	{ simbolo = simb_and;
+	  strncpy (token, yytext, TAM_TOKEN);
+	  IMPRIME(" and  ");
+	  return AND;
+	}
+
+not { simbolo = simb_not;
+	  strncpy (token, yytext, TAM_TOKEN);
+	  IMPRIME(" not  ");
+	  return NOT;
+	}
+
+or	{ simbolo = simb_or;
+	  strncpy (token, yytext, TAM_TOKEN);
+	  IMPRIME(" or  ");
+	  return OR;
+	}
+
+
+\>  { simbolo = simb_gt;
+      strncpy (token, yytext, TAM_TOKEN);
+      IMPRIME(" maior que  ");
+      return GT;
+ 	}
+
+\<  { simbolo = simb_lt;
+      strncpy (token, yytext, TAM_TOKEN);
+      IMPRIME(" menor que  ");
+      return LT;
+ 	}
+
+\=  { simbolo = simb_eq;
+      strncpy (token, yytext, TAM_TOKEN);
+      IMPRIME(" igual a  ");
+      return EQ;
+ 	}
+
+\+ { simbolo = simb_soma;
+     strncpy (token, yytext, TAM_TOKEN);
+     IMPRIME(" soma  ");
+     return SOMA;
+   }
+
+\-  { simbolo = simb_sub;
+      strncpy (token, yytext, TAM_TOKEN);
+      IMPRIME(" subtrai  ");
+      return SUB;
+ 	}
+
+\*  { simbolo = simb_mult;
+      strncpy (token, yytext, TAM_TOKEN);
+      IMPRIME(" multiplica  ");
+      return MULT;
+ 	}
+
+\<\> { simbolo = simb_diff;
+       strncpy (token, yytext, TAM_TOKEN);
+       IMPRIME(" diferente  ");
+       return DIFERENTE;
+ 	 }
+
+\<\= { simbolo = simb_lteq;
+       strncpy (token, yytext, TAM_TOKEN);
+       IMPRIME(" menor ou igual que  ");
+       return LTEQ;
+	 }
+
+\>\= { simbolo = simb_gteq;
+       strncpy (token, yytext, TAM_TOKEN);
+       IMPRIME(" maior ou igual que  ");
+       return GTEQ;
+}
+
+read { simbolo = simb_read;
+       strncpy (token, yytext, TAM_TOKEN);
+       IMPRIME(" read  ");
+       return READ;
+     }
+
+
+write { simbolo = simb_write;
+		strncpy (token, yytext, TAM_TOKEN);
+		IMPRIME(" write  ");
+		return WRITE;
+      }
+
+{tipo} { simbolo = simb_tipo;
+         strncpy (token, yytext, TAM_TOKEN);
+         IMPRIME(" tipo  ");
+         return TIPO;
+	   }
+
+{boolean} { simbolo = simb_boolean;
+               strncpy (token, yytext, TAM_TOKEN);
+               IMPRIME(" boolean  ");
+               return BOOLEAN;
+		     }
+
+{numero} { simbolo =  simb_numero;
+           strncpy (token, yytext, TAM_TOKEN);
+           IMPRIME(" numero  ");
+           return NUMERO;
+         }	
 
 %%
