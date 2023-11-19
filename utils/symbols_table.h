@@ -9,9 +9,9 @@ enum symbols_types {
 };
 
 enum symbols_variables {
-    SYMBOLS_VARIABLE_UNDEFINED,
     SYMBOLS_VARIABLES_INTEGER,
-    SYMBOLS_VARIABLE_BOOLEAN
+    SYMBOLS_VARIABLES_BOOLEAN,
+    SYMBOLS_VARIABLES_UNDEFINED
 };
 
 enum symbols_parameters_kind {
@@ -19,15 +19,17 @@ enum symbols_parameters_kind {
     SYMBOLS_PARAMETERS_REFERENCE
 };
 
-struct symbols_content {
-    enum symbols_variables var_type;
-    struct symbols_parameter {
+struct symbols_parameter {
         enum symbols_variables type;
         enum symbols_parameters_kind kind;
-    } param;
+};
+
+struct symbols_content {
+    enum symbols_variables var_type;
+    struct symbols_parameter param;
     struct {
         char label[20]; // rotulo de desvio
-        unsigned n_params;
+        int n_params;
         struct symbols_parameter params[128]; // informacoes de cada parametro
     } proc;
 };
