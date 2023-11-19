@@ -117,12 +117,6 @@ end { simbolo = simb_end;
           return FECHA_PARENTESES;
  }
 
-{ident} { simbolo = simb_identificador;
-          strncpy (token, yytext, TAM_TOKEN);
-          IMPRIME(" ident  ");
-          return IDENT;
-        }
-
 label { simbolo = simb_label;
 		strncpy (token, yytext, TAM_TOKEN);
 		IMPRIME(" label  ");
@@ -235,37 +229,37 @@ or	{ simbolo = simb_or;
 \>  { simbolo = simb_gt;
       strncpy (token, yytext, TAM_TOKEN);
       IMPRIME(" maior que  ");
-      return GT;
+      return MAIOR;
  	}
 
 \<  { simbolo = simb_lt;
       strncpy (token, yytext, TAM_TOKEN);
       IMPRIME(" menor que  ");
-      return LT;
+      return MENOR;
  	}
 
 \=  { simbolo = simb_eq;
       strncpy (token, yytext, TAM_TOKEN);
       IMPRIME(" igual a  ");
-      return EQ;
+      return IGUAL;
  	}
 
 \+ { simbolo = simb_soma;
      strncpy (token, yytext, TAM_TOKEN);
-     IMPRIME(" soma  ");
-     return SOMA;
+     IMPRIME(" mais  ");
+     return MAIS;
    }
 
 \-  { simbolo = simb_sub;
       strncpy (token, yytext, TAM_TOKEN);
-      IMPRIME(" subtrai  ");
-      return SUB;
+      IMPRIME(" menos  ");
+      return MENOS;
  	}
 
 \*  { simbolo = simb_mult;
       strncpy (token, yytext, TAM_TOKEN);
-      IMPRIME(" multiplica  ");
-      return MULT;
+      IMPRIME(" vezes  ");
+      return VEZES;
  	}
 
 \<\> { simbolo = simb_diff;
@@ -277,13 +271,13 @@ or	{ simbolo = simb_or;
 \<\= { simbolo = simb_lteq;
        strncpy (token, yytext, TAM_TOKEN);
        IMPRIME(" menor ou igual que  ");
-       return LTEQ;
+       return MENOR_IGUAL;
 	 }
 
 \>\= { simbolo = simb_gteq;
        strncpy (token, yytext, TAM_TOKEN);
        IMPRIME(" maior ou igual que  ");
-       return GTEQ;
+       return MAIOR_IGUAL;
 }
 
 read { simbolo = simb_read;
@@ -308,8 +302,14 @@ write { simbolo = simb_write;
 {boolean} { simbolo = simb_boolean;
                strncpy (token, yytext, TAM_TOKEN);
                IMPRIME(" boolean  ");
-               return BOOLEAN;
+               return VALOR_BOOL;
 		     }
+
+{ident} { simbolo = simb_identificador;
+          strncpy (token, yytext, TAM_TOKEN);
+          IMPRIME(" ident  ");
+          return IDENT;
+        }
 
 {numero} { simbolo =  simb_numero;
            strncpy (token, yytext, TAM_TOKEN);
