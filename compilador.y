@@ -1,7 +1,3 @@
-
-// Testar se funciona corretamente o empilhamento de par�metros
-// passados por valor ou por refer�ncia.
-
 %define parse.error verbose
 
 %{
@@ -14,6 +10,10 @@
 
 #include "utils/symbols_table.h"
 #include "utils/genlabels.h"
+
+#define MEPA_WRITE(_buf, _cmd, ...) snprintf(_buf, sizeof(_buf), _cmd, __VA_ARGS__), geraCodigo(NULL, _buf)
+#define LOG(_fmt, ...) fprintf(stderr, "%s:%d: " _fmt "\n", __func__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
+#define ASSERT(_expect, _fmt, ...) if (!(_expect)) LOG(_fmt, __VA_ARGS__), abort()
 
 int num_vars;
 int desloc_num_vars;
@@ -94,17 +94,16 @@ enum tipo_dado{
 
 // =========== REGRA 1 ============= //
 programa    :{
-             geraCodigo (NULL, "INPP");
-             tabela = symbols_table_init();
-             p_labels = genlabels_table_init();
-             nivel_lexico = 0;
-             }
-             PROGRAM IDENT
-             ABRE_PARENTESES input_idents FECHA_PARENTESES PONTO_E_VIRGULA
-             bloco PONTO {
-             sprintf (mepa_buf, "DMEM %d", num_vars_por_nivel[0]);
-             geraCodigo (NULL, mepa_buf);
-             geraCodigo (NULL, "PARA");
+               geraCodigo(NULL, "INPP");
+               tabela = symbols_table_init();
+               p_labels = genlabels_table_init();
+               nivel_lexico = 0;
+            }
+            PROGRAM IDENT
+            ABRE_PARENTESES input_idents FECHA_PARENTESES PONTO_E_VIRGULA
+            bloco PONTO {
+               MEPA_WRITE(mepa_buf, "DMEM %d", num_vars_por_nivel[0]);
+               geraCodigo (NULL, "PARA");
              }
 ;
 
@@ -116,17 +115,14 @@ input_idents: IDENT VIRGULA IDENT
 bloco       :
             parte_declara_vars
             {
-            //fprintf(stderr,"COISA DE TESTE \n");
-            label_a = genlabels_label_generate(p_labels);
-            sprintf(mepa_buf, "DSVS %s", label_a.label);
-            geraCodigo (NULL, mepa_buf);
-            nivel_lexico++;
+               label_a = genlabels_label_generate(p_labels);
+               MEPA_WRITE(mepa_buf, "DSVS %s", label_a.label);
+               ++nivel_lexico;
             }
-            parte_declara_sub_rotinas
-            {
-            nivel_lexico --;
-            label_a = genlabels_label_get(p_labels);
-            geraCodigo (label_a.label, "NADA");
+            parte_declara_sub_rotinas {
+               --nivel_lexico;
+               label_a = genlabels_label_get(p_labels);
+               geraCodigo (label_a.label, "NADA");
             }
             comando_composto
             {
@@ -137,14 +133,7 @@ bloco       :
 
 // =========== REGRA 8 ============= //
 parte_declara_vars: {desloc_num_vars = 0;}
-					VAR declaracao_de_vars/* {
-					   sprintf(mepa_buf, "AMEM %d", num_vars);
-                  ponteiro_pilha_num_vars++;
-                  pilha_num_vars[ponteiro_pilha_num_vars] = num_vars;
-					   geraCodigo(NULL,mepa_buf);
-					   }*/
-
-
+					VAR declaracao_de_vars
                |
 ;
 
@@ -156,50 +145,42 @@ declaracao_de_var: {
                      num_carrega_tipo = 0;
                      num_vars = 0;
                   }
-                  lista_idents DOIS_PONTOS tipo PONTO_E_VIRGULA{
-                     sprintf(mepa_buf, "AMEM %d", num_vars);
-                     ponteiro_pilha_num_vars++;
-                     pilha_num_vars[ponteiro_pilha_num_vars] = num_vars;
-                     geraCodigo(NULL,mepa_buf);
+                  lista_idents DOIS_PONTOS tipo PONTO_E_VIRGULA {
+                     MEPA_WRITE(mepa_buf, "AMEM %d", num_vars);
+                     pilha_num_vars[++ponteiro_pilha_num_vars] = num_vars;
 					   }
 
 ;
 
 tipo        : TIPO {
-                     if (!strcmp(token, "integer")){
-                        symbols_table_add_type(tabela, SYMBOLS_VARIABLES_INTEGER, num_carrega_tipo);
-                        $$ = SYMBOLS_VARIABLES_INTEGER;
-                     }   
-                     else if (!strcmp(token, "boolean")){   
-                        symbols_table_add_type(tabela, SYMBOLS_VARIABLES_BOOLEAN, num_carrega_tipo);
-                        $$ = SYMBOLS_VARIABLES_BOOLEAN;
-                     }
-                     else
-
-                        perror("TIPO ERRADO, CORRIGE, TA ERRADO");
-                     }
+                     const int type = 0 == strcmp(token, "integer") 
+                                       ?  SYMBOLS_VARIABLES_INTEGER
+                                       : strcmp(token, "boolean") ? SYMBOLS_VARIABLES_BOOLEAN : SYMBOLS_VARIABLES_UNDEFINED;
+                     symbols_table_add_type(tabela, type, num_carrega_tipo);
+                     $$ = type;
+            }
 ;
 
 
 // =========== REGRA 10 ============= //
 lista_idents: lista_idents VIRGULA IDENT {
-               printf("adicionado token [%s]\n", token);
+               LOG("Adding token [%s]\n", token);
                s = symbols_table_create_symbol(token, SYMBOLS_TYPES_VARIABLE, nivel_lexico, cc, desloc_num_vars);
                symbols_table_add(tabela, s);
-               num_carrega_tipo++;
-               num_vars++;
-               desloc_num_vars++;
-               num_vars_por_nivel[nivel_lexico]++;
-               }
+               ++num_carrega_tipo;
+               ++num_vars;
+               ++desloc_num_vars;
+               ++num_vars_por_nivel[nivel_lexico];
+            }
             | IDENT {
-               printf("adicionado token [%s]\n", token);
+               LOG("Adding token [%s]\n", token);
                s = symbols_table_create_symbol(token, SYMBOLS_TYPES_VARIABLE, nivel_lexico, cc, desloc_num_vars);
                symbols_table_add(tabela, s);
-               num_carrega_tipo++;
-               num_vars++;
-               desloc_num_vars++;
-               num_vars_por_nivel[nivel_lexico]++;
-               }
+               ++num_carrega_tipo;
+               ++num_vars;
+               ++desloc_num_vars;
+               ++num_vars_por_nivel[nivel_lexico];
+            }
 ;
 
 // =========== REGRA 16 ============= //
@@ -214,11 +195,9 @@ parte_declara_sub_rotinas:
 
 declara_procedimento:
                      PROCEDURE IDENT {
-                        strcpy(pilha_proc_name[pilha_proc], token);
-                        pilha_proc++;
+                        strcpy(pilha_proc_name[pilha_proc++], token);
                         num_params = 0;
-                     }
-                     parametros_formais_ou_nada {
+                     } parametros_formais_ou_nada {
                         label_a = genlabels_label_generate(p_labels);
                         sprintf(mepa_buf, "ENPR %d", nivel_lexico);
                         geraCodigo(label_a.label, mepa_buf);
@@ -228,40 +207,28 @@ declara_procedimento:
                      
                         memcpy(content.proc.params, lista_parametros, sizeof(struct symbols_parameter) * num_params);
                         
-                        // for(int i = 0; i < num_params; ++i){
-                        //    printf("proc.lista[%d] tem tipo %d e passado por %d \n", i, ti.proc.lista[i].type, ti.proc.lista[i].kind);
-                        // }
-                        //printf("nome: %s nivel: %d desloca: %d\n",proc_name, nivel_lexico, offset);
                         symbols_table_set_offset(tabela, num_params);
-
-                        s = symbols_table_create_symbol(pilha_proc_name[pilha_proc-1], SYMBOLS_TYPES_PROCEDURE, nivel_lexico, content, 0);
-
+                        s = symbols_table_create_symbol(pilha_proc_name[pilha_proc - 1], SYMBOLS_TYPES_PROCEDURE, nivel_lexico, content, 0);
                         symbols_table_add(tabela, s);
 
-                     } PONTO_E_VIRGULA {symbols_table_print(tabela);} bloco{
-                           sprintf(mepa_buf, "DMEM %d", pilha_num_vars[ponteiro_pilha_num_vars]);
-                           geraCodigo(NULL, mepa_buf);
-                           ponteiro_pilha_num_vars--;
-                           sprintf(mepa_buf, "RTPR %d, %d", nivel_lexico, num_params);
-                           geraCodigo(NULL, mepa_buf);
+                     } PONTO_E_VIRGULA {symbols_table_print(tabela);} bloco {
+                           MEPA_WRITE(mepa_buf, "DMEM %d", pilha_num_vars[ponteiro_pilha_num_vars--]);
+                           MEPA_WRITE(mepa_buf, "RTPR %d, %d", nivel_lexico, num_params);
                            label_a = genlabels_label_get(p_labels);
-                           pilha_proc--;
-                           symbols_table_remove_until(tabela,pilha_proc_name[pilha_proc]);
-                           //falta remover os simbolos da tabela de simbolos
+                           symbols_table_remove_until(tabela,pilha_proc_name[--pilha_proc]);
                      } PONTO_E_VIRGULA
 ;
 
 parametros_formais_ou_nada:
-               ABRE_PARENTESES {num_params = 0;} declaracao_params FECHA_PARENTESES
+               ABRE_PARENTESES { num_params = 0; } declaracao_params FECHA_PARENTESES
                |
 ;
 
 declara_function:
                FUNCTION IDENT {
-                  strcpy(pilha_proc_name[pilha_proc], token);
-                  pilha_proc++;
+                  strcpy(pilha_proc_name[pilha_proc++], token);
                   num_params = 0;
-               } parametros_formais_ou_nada{
+               } parametros_formais_ou_nada {
                   label_a = genlabels_label_generate(p_labels);
                   sprintf(mepa_buf, "ENPR %d", nivel_lexico);
                   geraCodigo(label_a.label, mepa_buf);
@@ -270,26 +237,17 @@ declara_function:
                   content.proc.n_params = num_params;
                
                   memcpy(content.proc.params, lista_parametros, sizeof(struct symbols_parameter) * num_params);
-                  
                   symbols_table_set_offset(tabela, num_params);
-
                   s = symbols_table_create_symbol(pilha_proc_name[pilha_proc-1], SYMBOLS_TYPES_FUNCTION, nivel_lexico, content, -(4 + num_params));
-
                   symbols_table_add(tabela, s);
-
-               } DOIS_PONTOS TIPO{
+               } DOIS_PONTOS TIPO {
                   symbols_table_add_type(tabela, SYMBOLS_VARIABLES_INTEGER, 1);
                } PONTO_E_VIRGULA bloco {
-
-                     sprintf(mepa_buf, "DMEM %d", pilha_num_vars[ponteiro_pilha_num_vars]);
-                     geraCodigo(NULL, mepa_buf);
-                     ponteiro_pilha_num_vars--;
-                     sprintf(mepa_buf, "RTPR %d, %d", nivel_lexico, num_params);
-                     geraCodigo(NULL, mepa_buf);
+                     MEPA_WRITE(mepa_buf, "DMEM %d", pilha_num_vars[ponteiro_pilha_num_vars]);
+                     --ponteiro_pilha_num_vars;
+                     MEPA_WRITE(mepa_buf, "RTPR %d, %d", nivel_lexico, num_params);
                      label_a = genlabels_label_get(p_labels);
-                     pilha_proc--;
-                     symbols_table_remove_until(tabela, pilha_proc_name[pilha_proc]);
-
+                     symbols_table_remove_until(tabela, pilha_proc_name[--pilha_proc]);
                } PONTO_E_VIRGULA
 
 ; 
@@ -306,40 +264,41 @@ declaracao_param: {
                      num_carrega_tipo = 0;
                   }
                    lista_params_formais DOIS_PONTOS tipo {
-                     for(int i = num_params; i > num_params - num_carrega_tipo; i--){
+                     for(int i = num_params; i > num_params - num_carrega_tipo; --i) {
                         lista_parametros[i-1].type = $4;
                      }
-                     num_carrega_tipo++;
+                     ++num_carrega_tipo;
                    }
 
 ;
 
 lista_params_formais:   
-                        lista_params_formais VIRGULA parametro {num_params++;}
-                        | parametro {num_params++;}
+                        lista_params_formais VIRGULA parametro { ++num_params; }
+                        | parametro { ++num_params; }
 ;
 
 //=======================================================================
 parametro:
          VAR IDENT {
-            cc.param.kind = SYMBOLS_PARAMETERS_REFERENCE;
-            param_aux.kind = SYMBOLS_PARAMETERS_REFERENCE;
+            cc.param.kind = param_aux.kind = SYMBOLS_PARAMETERS_REFERENCE;
             lista_parametros[num_params] = param_aux;
-            printf("adicionado token [%s]\n", token);
+
+            printf("Adding token [%s]", token);
             s = symbols_table_create_symbol(token, SYMBOLS_TYPES_PARAMETER, nivel_lexico, cc, -1);
             symbols_table_add(tabela, s);
-            num_carrega_tipo++;
+
+            ++num_carrega_tipo;
          } 
          |  IDENT {
-            cc.param.kind = SYMBOLS_PARAMETERS_COPY;
-            param_aux.kind = SYMBOLS_PARAMETERS_COPY;
+            cc.param.kind = param_aux.kind = SYMBOLS_PARAMETERS_COPY;
             lista_parametros[num_params] = param_aux;
-            printf("adicionado token [%s]\n", token);
+
+            LOG("Adding token [%s]", token);
             s = symbols_table_create_symbol(token, SYMBOLS_TYPES_PARAMETER, nivel_lexico, cc, -1);
-            printf("OI %d\n\n\n", num_params);
-            printf("TCHAU %d\n\n\n", s.offset);
+            LOG("n_params = %d; offset = %d\n\n", num_params, s.offset);
             symbols_table_add(tabela, s);
-            num_carrega_tipo++;
+
+            ++num_carrega_tipo;
          }
 ;
 
@@ -352,7 +311,7 @@ comandos:
 
 // =========== REGRA 18 ============= //
 comando: 
-         atribui_ou_func  {printf("ATRIBUICAO/FUNCAO ESCOLHIDA \n");}
+         atribui_ou_func  { LOG("ASSIGNMENT/FUNCTION OP CHOSEN"); }
          | comando_composto
          | comando_condicional
          | comando_repetitivo
@@ -364,60 +323,39 @@ comando:
 // =========== REGRA 19 ============= //
 atribui_ou_func:
          IDENT {
-            if ((esquerdo_func[esquerdo_recursao_func] = symbols_table_lookup(tabela, token)) == NULL) {
-               printf("ERRO: identificador {%s} nao encontrado/nao declarado", token );
-               abort();
-            }
-            esquerdo_recursao_func++;
-            printf("INDO PARA O ATRIBUI OU PARAMETROS\n");
-            printf("identificador achado = %s\n", esquerdo_func[esquerdo_recursao_func-1]->name);
+            esquerdo_func[esquerdo_recursao_func] = symbols_table_lookup(tabela, token);
+            ASSERT(esquerdo_func[esquerdo_recursao_func] != NULL, "Unknown token '%s'", token);
+            ++esquerdo_recursao_func;
+            LOG("Name = %s\n", esquerdo_func[esquerdo_recursao_func-1]->name);
          }
          continua_atibui_ou_func{
-            if ($3 == 1 )
-                esquerdo_recursao_func--;
+            if ($3 == 1) --esquerdo_recursao_func;
          }
 ;
 
 continua_atibui_ou_func:
-                  ATRIBUICAO atribui_contiunuacao {$$ = 1; printf("ATRIBUICAO ESCOLHIDA \n");}
-                  | parametros_ou_nada {$$ = 2; printf( "FUNCAO ESCOLHIDA \n");}
+                  ATRIBUICAO atribui_contiunuacao  { $$ = 1; LOG("ASSIGNMENT OP"); }
+                  | parametros_ou_nada { $$ = 2; LOG("FUNCTION OP"); }
 ;
 
 
-atribui_contiunuacao: { printf("ATRIBUICAO ESCOLHIDA - continuacao\n");}
+atribui_contiunuacao: { LOG("ASSIGNMENT OP (continuation)"); }
                    expressao{
-                     
-                     if(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_VARIABLE){
-                        if($2 == esquerdo_func[esquerdo_recursao_func-1]->content.var_type){
-                           sprintf(mepa_buf, "ARMZ %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset);
-                           geraCodigo(NULL, mepa_buf);
-                        }else{
-                           printf ("ERRO: expresao entre tipos incompativeis \n");
-                           abort();
-                        }
-                     }else if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PARAMETER){
-                        if($2 == esquerdo_func[esquerdo_recursao_func-1]->content.param.type){
-                           if (esquerdo_func[esquerdo_recursao_func-1]->content.param.kind == SYMBOLS_PARAMETERS_COPY ){
-                              sprintf(mepa_buf, "ARMZ %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                              geraCodigo(NULL, mepa_buf);
-                           }else if (esquerdo_func[esquerdo_recursao_func-1]->content.param.kind == SYMBOLS_PARAMETERS_REFERENCE){
-                              sprintf(mepa_buf, "ARMI %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                              geraCodigo(NULL, mepa_buf);
-                           }
-                        }else {
-                           printf ("ERRO: expresao entre tipos incompativeis \n");
-                           abort();
-                        }
-                     } 
-                     else if(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION){
-                         if($2 == esquerdo_func[esquerdo_recursao_func-1]->content.var_type){
-                           sprintf(mepa_buf, "ARMZ %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                           geraCodigo(NULL, mepa_buf);
-                        }else{
-                           printf ("ERRO: expresao entre tipos incompativeis \n");
-                           abort();
-                        } 
+                     const struct symbols_symbol *ret = esquerdo_func[esquerdo_recursao_func - 1];
+                     char const *command = NULL;
+
+                     switch (ret->type) {
+                     case SYMBOLS_TYPES_VARIABLE:
+                     case SYMBOLS_TYPES_FUNCTION:
+                        ASSERT($2 == ret->content.var_type, "Unexpected type: %d; Expected: %d", $2, ret->content.var_type);
+                        command = "ARMZ %d, %d";
+                        break;
+                     case SYMBOLS_TYPES_PARAMETER:
+                        ASSERT($2 == ret->content.param.type, "Unexpected type: %d; Expected: %d", $2, ret->content.param.type);
+                        command = ret->content.param.kind == SYMBOLS_PARAMETERS_COPY ? "ARMZ %d, %d" : "ARMI %d, %d";
+                        break;
                      }
+                     MEPA_WRITE(mepa_buf, command, ret->lexical_level, ret->offset);
                   }
 ;
 
@@ -426,92 +364,64 @@ atribui_contiunuacao: { printf("ATRIBUICAO ESCOLHIDA - continuacao\n");}
 // =========== REGRA 20 ============= //
 funcao_ou_ident:
                IDENT {
-                  if ((esquerdo_func[esquerdo_recursao_func] = symbols_table_lookup(tabela, token)) == NULL) {
-                        printf("falha ao procurar token %s\n", token);
-                     abort();
-                  }
-                  esquerdo_recursao_func++;  //evita de esquerdo_func se sobrescrito dentro de uma chamada recursiva de funcao_ou_ident
-                  printf("identificador achado = %s com tipo %d e tipo mesmo %d\n", esquerdo_func[esquerdo_recursao_func-1]->name,
-                        esquerdo_func[esquerdo_recursao_func-1]->type,
-                        esquerdo_func[esquerdo_recursao_func-1]->content.var_type);
+                  esquerdo_func[esquerdo_recursao_func] = symbols_table_lookup(tabela, token);
+                  ASSERT(esquerdo_func[esquerdo_recursao_func] != NULL, "Couldn't find token '%s'", token);
+                  ++esquerdo_recursao_func;
+                  LOG("Name = %s; Type %d; Variable Type = %d",
+                      esquerdo_func[esquerdo_recursao_func - 1]->name,
+                      esquerdo_func[esquerdo_recursao_func - 1]->type,
+                      esquerdo_func[esquerdo_recursao_func - 1]->content.var_type);
                }
+
                parametros_ou_nada {
-                  if (em_chamada_de_funcao){
-                     printf("EM CHAMADA DE FUNCAO AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
-                     printf("token sendo pesquisado %s, numero atual = %i\n", esquerdo_func[esquerdo_recursao_func-2]->name, num_params);
-                     printf("por referencia? %i\n", esquerdo_func[esquerdo_recursao_func-2]->content.proc.params[num_params].type);
-                     if (esquerdo_func[esquerdo_recursao_func-2]->content.proc.params[num_params].kind == SYMBOLS_PARAMETERS_REFERENCE){
-                        printf("EH UMA REFERENCIA BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n");
-                        if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_VARIABLE){
-                           printf("EH UMA VARAIVEL CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\n");
-                           sprintf(mepa_buf, "CREN %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                           geraCodigo(NULL, mepa_buf);
-                           $$ = esquerdo_func[esquerdo_recursao_func-1]->content.var_type;
-                        }else if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PARAMETER){
-                            printf("EH UMA PARAMETRO DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\n");
-                           if(esquerdo_func[esquerdo_recursao_func-1]->content.param.kind == SYMBOLS_PARAMETERS_COPY){
-                              sprintf(mepa_buf, "CREM %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                              geraCodigo(NULL, mepa_buf);
-                              $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
-                           }else if(esquerdo_func[esquerdo_recursao_func-1]->content.param.kind == SYMBOLS_PARAMETERS_REFERENCE){
-                              sprintf(mepa_buf, "CRVL %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                              geraCodigo(NULL, mepa_buf);
-                              $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
-                           }
-                        }
-                     }else {
-                        if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_VARIABLE){
-                           sprintf(mepa_buf, "CRVL %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                           geraCodigo(NULL, mepa_buf);
-                           $$ = esquerdo_func[esquerdo_recursao_func-1]->content.var_type;
-                        }else if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PARAMETER){
-                           if(esquerdo_func[esquerdo_recursao_func-1]->content.param.kind == SYMBOLS_PARAMETERS_COPY){
-                              sprintf(mepa_buf, "CRVL %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                              geraCodigo(NULL, mepa_buf);
-                              $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
-                           } else if(esquerdo_func[esquerdo_recursao_func-1]->content.param.kind == SYMBOLS_PARAMETERS_REFERENCE){
-                              sprintf(mepa_buf, "CRVI %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                              geraCodigo(NULL, mepa_buf);
-                              $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
-                           }
-                        }
+                  const struct symbols_symbol *ret = esquerdo_func[esquerdo_recursao_func - 1];
+                  char const *command = NULL;
+                  int return_type = -1;
+
+                  const struct symbols_symbol *func = esquerdo_func[esquerdo_recursao_func - 2];
+                  if (em_chamada_de_funcao && (func->content.proc.params[num_params].kind == SYMBOLS_PARAMETERS_REFERENCE)) {
+                     LOG("Entered a function call...\n"
+                         "Token to be searched = '%s'; Params count = %d; Passing by reference = %d",
+                         func->name, num_params, func->content.proc.params[num_params].type);
+
+                     switch (ret->type) {
+                     case SYMBOLS_TYPES_VARIABLE:
+                        command = "CREN %d, %d";
+                        return_type = ret->content.var_type;
+                        break;
+                     case SYMBOLS_TYPES_PARAMETER:
+                        command = ret->content.param.kind == SYMBOLS_PARAMETERS_COPY ? "CREM %d, %d" : "CRVL %d, %d";
+                        return_type = ret->content.param.type;
+                        break;
                      }
                   } else {
-                     if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_VARIABLE){
-                        sprintf(mepa_buf, "CRVL %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset );
-                        geraCodigo(NULL, mepa_buf);
-                        $$ = esquerdo_func[esquerdo_recursao_func-1]->content.var_type;
-                     }else if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PARAMETER){
-                        if(esquerdo_func[esquerdo_recursao_func-1]->content.param.kind == SYMBOLS_PARAMETERS_COPY){
-                           sprintf(mepa_buf, "CRVL %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset);
-                           geraCodigo(NULL, mepa_buf);
-                           $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
-                        }else if(esquerdo_func[esquerdo_recursao_func-1]->content.param.kind == SYMBOLS_PARAMETERS_REFERENCE){
-                           sprintf(mepa_buf, "CRVI %d, %d",esquerdo_func[esquerdo_recursao_func-1]->lexical_level , esquerdo_func[esquerdo_recursao_func-1]->offset);
-                           geraCodigo(NULL, mepa_buf);
-                           $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
-                        }
+                     switch (ret->type) {
+                     case SYMBOLS_TYPES_VARIABLE:
+                        command = "CRVL %d, %d";
+                        return_type = ret->content.var_type;
+                        break;
+                     case SYMBOLS_TYPES_PARAMETER:
+                        command = ret->content.param.kind == SYMBOLS_PARAMETERS_COPY ? "CRVL %d, %d" : "CRVI %d, %d";
+                        return_type = ret->content.param.type;
+                        break;
                      }
                   }
-                  esquerdo_recursao_func--;
+                  LOG("Type is %d", ret->type);
+
+                  if (return_type != -1) {
+                     MEPA_WRITE(mepa_buf, command, ret->lexical_level, ret->offset);
+                     $$ = return_type;
+                  }
+                  --esquerdo_recursao_func;
                }
 ;
 
 parametros_ou_nada:
                  empilha_retorno ABRE_PARENTESES {num_params = 0; em_chamada_de_funcao = 1;}lista_params {em_chamada_de_funcao = 0;} FECHA_PARENTESES {
-                 if(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION || esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PROCEDURE){
-                     $$ = SYMBOLS_VARIABLES_UNDEFINED; //caso seja procedure
-                     if (esquerdo_func[esquerdo_recursao_func-1]->content.proc.n_params != num_params){
-                        printf("%d %d\n", esquerdo_func[esquerdo_recursao_func-1]->content.proc.n_params, num_params);
-                        printf("ERRO: numero errado de parametros\n");
-                        abort();
-                     }
-                     sprintf(mepa_buf, "CHPR %s, %d", esquerdo_func[esquerdo_recursao_func - 1]->content.proc.label, nivel_lexico);
-                     geraCodigo(NULL, mepa_buf);
-                  }else{
-                     printf("ERRO: {%s} nao eh funcao ou procedimento\n", esquerdo_func[esquerdo_recursao_func - 1]->name);
-                     abort();
-                  }
+                  ASSERT(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION || esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PROCEDURE, "Not a function or procedure (%s)", esquerdo_func[esquerdo_recursao_func - 1]->name);
+                  ASSERT(esquerdo_func[esquerdo_recursao_func-1]->content.proc.n_params == num_params, "Wrong amount of parameters (%d vs %d)", esquerdo_func[esquerdo_recursao_func-1]->content.proc.n_params, num_params);
+                  $$ = SYMBOLS_VARIABLES_UNDEFINED;
+                  MEPA_WRITE(mepa_buf, "CHPR %s, %d", esquerdo_func[esquerdo_recursao_func-1]->content.proc.label , nivel_lexico);
                 }
                 | empilha_retorno {
                   if(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION || esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PROCEDURE){
@@ -520,14 +430,13 @@ parametros_ou_nada:
                         geraCodigo(NULL, "AMEM 1");
                         $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
                      }
-                     sprintf(mepa_buf, "CHPR %s, %d", esquerdo_func[esquerdo_recursao_func-1]->content.proc.label , nivel_lexico);
-                     geraCodigo(NULL, mepa_buf);
+                     MEPA_WRITE(mepa_buf, "CHPR %s, %d", esquerdo_func[esquerdo_recursao_func-1]->content.proc.label , nivel_lexico);
                   }
                 }
 ;
 
 empilha_retorno:  {
-                     if(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION){
+                     if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION){
                         geraCodigo(NULL, "AMEM 1");
                         $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
                      }
@@ -535,34 +444,28 @@ empilha_retorno:  {
 ;
 
 lista_params:  
-               lista_params VIRGULA expressao {num_params++; }
-               | {printf("%d\n",num_params); }expressao {num_params++;}
+               lista_params VIRGULA expressao { ++num_params; }
+               | { LOG("%d", num_params); } expressao { ++num_params; }
 ;
 
 // =========== REGRA 22 ============= //
 comando_condicional:
                   if_then cond_else {
-                        //fprintf(stderr, "TERMONOU O BHUR \n");
-                        label_a = genlabels_label_get(p_labels);
-                        geraCodigo (label_a.label, "NADA"); 
+                     label_a = genlabels_label_get(p_labels);
+                     geraCodigo (label_a.label, "NADA"); 
                   }
 ;
 
 if_then:
          IF expressao {
-            if($2 == SYMBOLS_VARIABLES_BOOLEAN){
-               label_a = genlabels_label_generate(p_labels); // segundo label que vai se usado depois
-                label_a = genlabels_label_generate(p_labels); // segundo label que vai se usado depois
-               sprintf(mepa_buf, "DSVF %s",label_a.label);
-               geraCodigo(NULL, mepa_buf);
-            }else{
-               exit(1);
-            }
+            ASSERT($2 == SYMBOLS_VARIABLES_BOOLEAN, "Unexpected type: %d; Expected: %d", $2, SYMBOLS_VARIABLES_BOOLEAN);
+            label_a = genlabels_label_generate(p_labels);
+            label_a = genlabels_label_generate(p_labels);
+            MEPA_WRITE(mepa_buf, "DSVF %s", label_a.label);
          }
          THEN comando {
             label_a = p_labels->labels[p_labels->top - 2];
-            sprintf(mepa_buf, "DSVS %s",label_a.label);
-            geraCodigo(NULL, mepa_buf);
+            MEPA_WRITE(mepa_buf, "DSVS %s", label_a.label);
             label_a = genlabels_label_get(p_labels);
             geraCodigo(label_a.label, "NADA"); 
          }
@@ -575,25 +478,20 @@ cond_else:
 
 // =========== REGRA 23 ============= //
 comando_repetitivo:{
-                        label_a = genlabels_label_generate(p_labels); //cria um label mas esse e o proximo label vai ser usado como fila e nao como pilha
+                        label_a = genlabels_label_generate(p_labels);
                         geraCodigo(label_a.label, "NADA"); 
                      }
                      WHILE while_resto
 ;                     
 while_resto:                     
                      expressao {
-                        if($1 == SYMBOLS_VARIABLES_BOOLEAN){
-                           label_a = genlabels_label_generate(p_labels); // segundo label que vai se usado depois
-                           sprintf(mepa_buf, "DSVF %s",label_a.label);
-                           geraCodigo(NULL, mepa_buf);
-                        }else{
-                           abort();
-                        }   
+                        ASSERT($1 == SYMBOLS_VARIABLES_BOOLEAN, "Unexpected type: %d; Expected: %d", $1, SYMBOLS_VARIABLES_BOOLEAN);
+                        label_a = genlabels_label_generate(p_labels);
+                        MEPA_WRITE(mepa_buf, "DSVF %s", label_a.label);
                      }
                      DO comando{
                         label_a = p_labels->labels[p_labels->top-2];
-                        sprintf(mepa_buf, "DSVS %s",label_a.label);
-                        geraCodigo(NULL, mepa_buf);
+                        MEPA_WRITE(mepa_buf, "DSVS %s", label_a.label);
                         label_a = p_labels->labels[p_labels->top-1];
                         geraCodigo (label_a.label, "NADA"); 
                         genlabels_table_pop_n(p_labels, 2);
@@ -604,14 +502,8 @@ while_resto:
 expressao:
             expressao_simples relacao expressao_simples{
                geraCodigo(NULL, $2);
-               if ($1 == $3)
-                  $$ = SYMBOLS_VARIABLES_BOOLEAN;
-               else{
-                  printf ("ERRO: expressao entre tipos incompativeis esquerda: %s direita: %s\n",
-                        $1 == SYMBOLS_VARIABLES_INTEGER ? "inteiro" : "booleano",
-                        $3 == SYMBOLS_VARIABLES_INTEGER ? "inteiro" : "booleano");
-                  abort();
-               }
+               ASSERT($1 == $3, "Unexpected type: %d; Expected: %d", $1, $3);
+               $$ = SYMBOLS_VARIABLES_BOOLEAN;
             }
             | expressao_simples {
                $$ = $1;
@@ -634,48 +526,28 @@ expressao_simples:
                   $$ = $1;
                }
                | MAIS termo {
-                  if ($2 == SYMBOLS_VARIABLES_INTEGER)
-                     $$ = $2;
-                  else{
-                     printf ("ERRO: expresao entre tipos incompativeis \n");
-                     abort();
-                  }
+                  ASSERT($2 == SYMBOLS_VARIABLES_INTEGER, "Unexpected type: %d; Expected: %d", $2, SYMBOLS_VARIABLES_BOOLEAN);
+                  $$ = $2;
                }
                | MENOS termo {
                   geraCodigo(NULL, "INVR");
-                  if ($2 == SYMBOLS_VARIABLES_INTEGER)
-                     $$ = $2;
-                  else{
-                     printf ("ERRO: expresao entre tipos incompativeis \n");
-                     abort();
-                  }
+                  ASSERT($2 == SYMBOLS_VARIABLES_INTEGER, "Unexpected type: %d; Expected: %d", $2, SYMBOLS_VARIABLES_BOOLEAN);
+                  $$ = $2;
                }
                | expressao_simples MAIS termo  {
-                  geraCodigo( NULL, "SOMA");
-                  if ($1 == $3 && $1 == SYMBOLS_VARIABLES_INTEGER)
-                     $$ = $3;
-                  else{
-                     printf ("ERRO: expresao entre tipos incompativeis \n");
-                     abort();
-                  }
+                  geraCodigo(NULL, "SOMA");
+                  ASSERT($1 == $3 && $1 == SYMBOLS_VARIABLES_INTEGER, "Expression between incompatible types (%d, %d)", $1, $3);
+                  $$ = $3;
                }
                | expressao_simples MENOS termo {
-                  geraCodigo( NULL, "SUBT");
-                  if ($1 == $3 && $1 == SYMBOLS_VARIABLES_INTEGER)
-                     $$ = $3;
-                  else{
-                     printf ("ERRO: expresao entre tipos incompativeis \n");
-                     abort();
-                  }
+                  geraCodigo(NULL, "SUBT");
+                  ASSERT($1 == $3 && $1 == SYMBOLS_VARIABLES_INTEGER, "Expression between incompatible types (%d, %d)", $1, $3);
+                  $$ = $3;
                }
                | expressao_simples OR termo {
-                  geraCodigo( NULL, "DISJ");
-                  if ($1 == $3 && $1 == SYMBOLS_VARIABLES_BOOLEAN)
-                     $$ = $3;
-                  else{
-                     printf ("ERRO: expresao entre tipos incompativeis \n");
-                     abort();
-                  }
+                  geraCodigo(NULL, "DISJ");
+                  ASSERT($1 == $3 && $1 == SYMBOLS_VARIABLES_BOOLEAN, "Expression between incompatible types (%d, %d)", $1, $3);
+                  $$ = $3;
                }
 ;
 
@@ -684,61 +556,41 @@ termo:
          $$ = $1;
       }
       | termo DIV fator  {
-         geraCodigo( NULL, "DIVI");
-         if ($1 == $3 && $1 == SYMBOLS_VARIABLES_INTEGER)
-            $$ = $3;
-         else{
-            printf ("ERRO: expresao entre tipos incompativeis \n");
-            abort();
-         }
+         geraCodigo(NULL, "DIVI");
+         ASSERT($1 == $3 && $1 == SYMBOLS_VARIABLES_INTEGER, "Expression between incompatible types (%d, %d)", $1, $3);
+         $$ = $3;
       }
       | termo VEZES fator  {
-         geraCodigo( NULL, "MULT");
-         if ($1 == $3 && $1 == SYMBOLS_VARIABLES_INTEGER)
-            $$ = $3;
-         else{
-            printf ("ERRO: expresao entre tipos incompativeis \n");
-            abort();
-         }
+         geraCodigo(NULL, "MULT");
+         ASSERT($1 == $3 && $1 == SYMBOLS_VARIABLES_INTEGER, "Expression between incompatible types (%d, %d)", $1, $3);
+         $$ = $3;
       }
       | termo AND fator  {
-          geraCodigo( NULL, "CONJ");
-          if ($1 == $3 && $1 == SYMBOLS_VARIABLES_BOOLEAN)
-            $$ = $3;
-          else{
-            printf ("ERRO: expresao entre tipos incompativeis \n");
-            abort();
-          }
+         geraCodigo(NULL, "CONJ");
+         ASSERT($1 == $3 && $1 == SYMBOLS_VARIABLES_BOOLEAN, "Expression between incompatible types (%d, %d)", $1, $3);
+         $$ = $3;
       }
 ;
 
 fator:
       funcao_ou_ident {
-        $$ = $1;
+         $$ = $1;
       }
       | NUMERO {
-         sprintf (mepa_buf, "CRCT %d", atoi(token));
-         geraCodigo(NULL, mepa_buf);
+         MEPA_WRITE(mepa_buf, "CRCT %ld", strtol(token, NULL, 10));
          $$ = SYMBOLS_VARIABLES_INTEGER;
       }   
       | VALOR_BOOL {
-         if(strcmp(token, "True") == 0)
-            sprintf (mepa_buf, "CRCT %d", 1);
-         else
-            sprintf (mepa_buf, "CRCT %d", 0);
-         geraCodigo(NULL, mepa_buf);
+         MEPA_WRITE(mepa_buf, "CRCT %d", 0 == strcmp(token, "True"));
          $$ = SYMBOLS_VARIABLES_BOOLEAN;
       }
       | ABRE_PARENTESES expressao_simples FECHA_PARENTESES{
          $$ = $2;
       }
-      | NOT fator{
-         if($2 == SYMBOLS_VARIABLES_BOOLEAN){
-            geraCodigo(NULL, "NEGA");
-            $$ = $2;
-         }   
-         else
-            abort();
+      | NOT fator {
+         ASSERT($2 == SYMBOLS_VARIABLES_BOOLEAN, "Unexpected type: %d; Expected: %d", $2, SYMBOLS_VARIABLES_BOOLEAN);
+         geraCodigo(NULL, "NEGA");
+         $$ = $2;
       }
 ;
 
@@ -755,16 +607,12 @@ parametros_de_leitura:
 ;
 
 parametro_leitura:
-                  IDENT{
+                  IDENT {
                      geraCodigo(NULL, "LEIT");
-                     printf("buscando token %s\n", token);
-                     if((ps = symbols_table_lookup(tabela, token)) != NULL){
-                        sprintf(mepa_buf, "ARMZ %d, %d", ps->lexical_level, ps->offset);
-                        geraCodigo(NULL, mepa_buf);
-                     }else{
-                        printf("falha ao procurar token %s\n", token);
-                        abort();
-                     }
+                     LOG("Searching token '%s' ...", token);
+                     ps = symbols_table_lookup(tabela, token);
+                     ASSERT(ps != NULL, "Couldn't find token '%s'", token);
+                     MEPA_WRITE(mepa_buf, "ARMZ %d, %d", ps->lexical_level, ps->offset);
                   }
 ;
 
@@ -783,9 +631,8 @@ parametro_escrita:
                   expressao_simples {
                      if ($1 != SYMBOLS_VARIABLES_UNDEFINED)
                         geraCodigo(NULL, "IMPR");
-                     else {
-                        printf("parametro incompativel\n");
-                     }   
+                     else
+                        LOG("Incompatible parameter");
                   }
 
 ;
@@ -798,13 +645,13 @@ int main (int argc, const char **argv) {
    extern FILE* yyin;
 
    if (argc<2 || argc>2) {
-      printf("usage compilador <arq>a %d\n", argc);
+      LOG("Usage: ./%s <file>", argv[0]);
       return EXIT_FAILURE;
    }
 
    FILE *fp = fopen (argv[1], "r");
    if (fp == NULL) {
-      printf("usage compilador <arq>b\n");
+      LOG("Usage: ./%s <file>", argv[0]);
       return EXIT_FAILURE;
    }
 
@@ -812,7 +659,7 @@ int main (int argc, const char **argv) {
  *  Inicia a Tabela de S�mbolos
  * ------------------------------------------------------------------- */
 
-   yyin=fp;
+   yyin = fp;
    yyparse();
 
    symbols_table_print(tabela);

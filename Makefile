@@ -35,9 +35,6 @@ clean :
 	@ rm -f compilador.tab.* lex.yy.c compilador.o compilador
 	@ $(MAKE) -C $(UTILS_DIR) $@
 
-echo :
-	@ echo "$(EXAMPLES)"
-
 test :
 	for ex in $(EXAMPLES_DIR)/*; do \
 		echo -n "Testando $$ex/pgma.pas: "; \
