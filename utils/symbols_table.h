@@ -29,6 +29,7 @@ struct symbols_content {
     struct symbols_parameter param;
     struct {
         char label[20]; // rotulo de desvio
+        char forwarded_label[20];
         int n_params;
         struct symbols_parameter params[128]; // informacoes de cada parametro
     } proc;

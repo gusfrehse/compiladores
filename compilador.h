@@ -11,7 +11,7 @@
  *
  * ------------------------------------------------------------------- */
 
-#define TAM_TOKEN 16
+#define TAM_TOKEN 100
 
 typedef enum simbolos {
   simb_program, simb_var, simb_begin, simb_end,

@@ -1,0 +1,25 @@
+1. Descreva a ideia original para abordar a alteração
+
+    A abordagem original consistiu em criar duas labels ao se deparar com a
+    declaração de uma função ou procedimento do tipo "forward". A primeira
+    label corresponde à declaração em si, enquanto a segunda label é especial
+    e chamada de "forwarded_label". A forwarded_label aponta para a definição
+    real da função ou procedimento, e a label normal direciona o desvio para
+    a forwarded_label quando a definição correspondente é encontrada.
+
+2. O que deu certo e o que teve de ser modificado no trajeto
+
+    O que deu certo inclui a introdução bem-sucedida da regra para "forward"
+    como uma alternativa à definição já existente para funções e procedimentos.
+    Além disso, foram realizadas atualizações nas regras existentes, como
+    tornar o ponto e vírgula no último comando dos comandos compostos opcional
+    e permitir o uso opcional de parênteses em expressões condicionais.
+
+3. Quais os maiores problemas para fazer funcionar
+
+    O maior problema encontrado foi relacionado à organização dos labels.
+    A introdução de duas labels para uma mesma função exigiu uma lógica
+    cuidadosa para garantir que a implementação fosse eficiente e não
+    introduzisse complexidade desnecessária. A gestão adequada das labels
+    e sua interação com as declarações e definições representou um desafio
+    durante a implementação.

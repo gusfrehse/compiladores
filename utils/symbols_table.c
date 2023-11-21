@@ -70,9 +70,11 @@ symbols_table_print(struct symbols_table *table)
         if (table->symbols[i].type == SYMBOLS_TYPES_PROCEDURE
             || table->symbols[i].type == SYMBOLS_TYPES_FUNCTION)
         {
-            printf("Simbolo %i: token = %s || nivel = %i || rotulo = %s ", i,
+            printf("Simbolo %i: token = %s || nivel = %i || rotulo = '%s' || forwarded_label = '%s' ", i,
                    table->symbols[i].name, table->symbols[i].lexical_level,
-                   table->symbols[i].content.proc.label);
+                   table->symbols[i].content.proc.label,
+                   table->symbols[i].content.proc.forwarded_label);
+
             for (int j = 0; j < table->symbols[i].content.proc.n_params; j++) {
                 printf("\tP%i[T: %i|PASS: %i] ", j,
                        table->symbols[i].content.proc.params[j].type,

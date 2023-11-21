@@ -215,7 +215,7 @@ declara_function:
                FUNCTION IDENT {
                   strcpy(function_names[num_function_names++], token);
                   num_parameters = 0;
-               } parametros_formais_ou_nada {
+               } parametros_formais_ou_nada DOIS_PONTOS TIPO PONTO_E_VIRGULA {
                   label_a = genlabels_label_generate(p_labels);
                   sprintf(mepa_buf, "ENPR %d", lexical_level);
                   geraCodigo(label_a.label, mepa_buf);
@@ -225,45 +225,11 @@ declara_function:
                
                   memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
                   symbols_table_set_offset(table, num_parameters);
-                  s = symbols_table_create_symbol(function_names[num_function_names-1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
+                  s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
                   symbols_table_add(table, s);
-               } DOIS_PONTOS TIPO {
                   symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
-               } PONTO_E_VIRGULA FORWARD {
-                     MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[--num_mem_allocations]);
-                     MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
-                     label_a = genlabels_label_get(p_labels);
-                     symbols_table_remove_until(table, function_names[--num_function_names]);
-               } PONTO_E_VIRGULA
-               |
-               FUNCTION IDENT {
-                  strcpy(function_names[num_function_names++], token);
-                  num_parameters = 0;
-               } parametros_formais_ou_nada {
-                  label_a = genlabels_label_generate(p_labels);
-                  sprintf(mepa_buf, "ENPR %d", lexical_level);
-                  geraCodigo(label_a.label, mepa_buf);
-
-                  strcpy(content.proc.label, label_a.label);
-                  content.proc.n_params = num_parameters;
-               
-                  memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
-                  symbols_table_set_offset(table, num_parameters);
-                  s = symbols_table_create_symbol(function_names[num_function_names-1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
-                  symbols_table_add(table, s);
-               } DOIS_PONTOS TIPO {
-                  symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
-               } PONTO_E_VIRGULA bloco {
-                     MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[--num_mem_allocations]);
-                     MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
-                     label_a = genlabels_label_get(p_labels);
-                     symbols_table_remove_until(table, function_names[--num_function_names]);
-               } PONTO_E_VIRGULA
-
+               } bloco_ou_forward PONTO_E_VIRGULA
 ; 
-
-
-
 
 //====================================================================
 declaracao_params: declaracao_params PONTO_E_VIRGULA declaracao_param 
@@ -558,6 +524,16 @@ expressao_simples:
                   ASSERT($1 == $3 && $1 == SYMBOLS_VARIABLES_BOOLEAN, "Expression between incompatible types (%d, %d)", $1, $3);
                   $$ = $3;
                }
+;
+
+bloco_ou_forward:
+      FORWARD { }
+      | bloco {
+         MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[--num_mem_allocations]);
+         MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
+         label_a = genlabels_label_get(p_labels);
+         symbols_table_remove_until(table, function_names[--num_function_names]);
+      }
 ;
 
 termo: 
