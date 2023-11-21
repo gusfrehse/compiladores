@@ -49,7 +49,7 @@ int inside_function_call = 0;
 %token DIV AND NOT OR TIPO VALOR_BOOL NUMERO
 %token MAIOR MENOR IGUAL MENOR_IGUAL MAIOR_IGUAL DIFERENTE
 %token MAIS MENOS VEZES
-%token READ WRITE
+%token READ WRITE FORWARD
 
 %union{
    char * str;  // define o tipo str
@@ -212,6 +212,30 @@ parametros_formais_ou_nada:
 ;
 
 declara_function:
+               FUNCTION IDENT {
+                  strcpy(function_names[num_function_names++], token);
+                  num_parameters = 0;
+               } parametros_formais_ou_nada {
+                  label_a = genlabels_label_generate(p_labels);
+                  sprintf(mepa_buf, "ENPR %d", lexical_level);
+                  geraCodigo(label_a.label, mepa_buf);
+
+                  strcpy(content.proc.label, label_a.label);
+                  content.proc.n_params = num_parameters;
+               
+                  memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
+                  symbols_table_set_offset(table, num_parameters);
+                  s = symbols_table_create_symbol(function_names[num_function_names-1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
+                  symbols_table_add(table, s);
+               } DOIS_PONTOS TIPO {
+                  symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
+               } PONTO_E_VIRGULA FORWARD {
+                     MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[--num_mem_allocations]);
+                     MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
+                     label_a = genlabels_label_get(p_labels);
+                     symbols_table_remove_until(table, function_names[--num_function_names]);
+               } PONTO_E_VIRGULA
+               |
                FUNCTION IDENT {
                   strcpy(function_names[num_function_names++], token);
                   num_parameters = 0;

@@ -293,6 +293,13 @@ write { simbolo = simb_write;
 		return WRITE;
       }
 
+forward { simbolo = simb_write;
+		strncpy (token, yytext, TAM_TOKEN);
+		IMPRIME(" forward  ");
+		return FORWARD;
+      }
+
+
 {tipo} { simbolo = simb_tipo;
          strncpy (token, yytext, TAM_TOKEN);
          IMPRIME(" tipo  ");
