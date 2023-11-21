@@ -15,38 +15,28 @@
 #define LOG(_fmt, ...) fprintf(stderr, "%s:%d: " _fmt "\n", __func__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
 #define ASSERT(_expect, _fmt, ...) if (!(_expect)) LOG(_fmt, __VA_ARGS__), abort()
 
-int num_vars;
-int desloc_num_vars;
+int current_num_vars;
+int current_offset;
 char mepa_buf[128];
-int nivel_lexico;
-int num_carrega_tipo;
+int lexical_level;
+int num_same_type;
 struct symbols_content cc;
-struct symbols_table *tabela;
-struct symbols_symbol s ,lista_simbolos[128];
-struct symbols_parameter lista_parametros[128];
+struct symbols_table *table;
+struct symbols_symbol s;
+struct symbols_parameter parameters[128];
+int num_parameters;
 struct symbols_parameter param_aux;
-struct symbols_symbol *ps;
-struct symbols_symbol *esquerdo;
-int esquerdo_recursao_func = 0;
-struct symbols_symbol *esquerdo_func[100];
-int num_vars_por_nivel[10];
+struct symbols_symbol *nested_functions[100];
+int num_nested_functions = 0;
+int num_vars_by_level[10];
 struct genlabels_table *p_labels;
 struct genlabels_label label_a;
-int num_params;
-char proc_name[128];
 struct symbols_content content;
-int pilha_num_vars[1000];
-char pilha_proc_name[100][128];
-int pilha_proc = 0;
-int ponteiro_pilha_num_vars = 0;
-int em_chamada_de_funcao = 0;
-
-
-enum tipo_dado{
-    t_int,
-    t_bool
-};
-
+int mem_allocations[1000];
+int num_mem_allocations = 0;
+char function_names[100][128];
+int num_function_names = 0;
+int inside_function_call = 0;
 
 %}
 
@@ -78,9 +68,6 @@ enum tipo_dado{
 %type <int_val> continua_atibui_ou_func;
 %type <int_val> tipo;
 
-
-
-
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
 
@@ -95,16 +82,16 @@ enum tipo_dado{
 // =========== REGRA 1 ============= //
 programa    :{
                geraCodigo(NULL, "INPP");
-               tabela = symbols_table_init();
+               table = symbols_table_init();
                p_labels = genlabels_table_init();
-               nivel_lexico = 0;
+               lexical_level = 0;
             }
             PROGRAM IDENT
             ABRE_PARENTESES input_idents FECHA_PARENTESES PONTO_E_VIRGULA
             bloco PONTO {
-               MEPA_WRITE(mepa_buf, "DMEM %d", num_vars_por_nivel[0]);
+               MEPA_WRITE(mepa_buf, "DMEM %d", num_vars_by_level[0]);
                geraCodigo (NULL, "PARA");
-             }
+            }
 ;
 
 
@@ -117,10 +104,10 @@ bloco       :
             {
                label_a = genlabels_label_generate(p_labels);
                MEPA_WRITE(mepa_buf, "DSVS %s", label_a.label);
-               ++nivel_lexico;
+               ++lexical_level;
             }
             parte_declara_sub_rotinas {
-               --nivel_lexico;
+               --lexical_level;
                label_a = genlabels_label_get(p_labels);
                geraCodigo (label_a.label, "NADA");
             }
@@ -132,7 +119,7 @@ bloco       :
 
 
 // =========== REGRA 8 ============= //
-parte_declara_vars: {desloc_num_vars = 0;}
+parte_declara_vars: {current_offset = 0;}
 					VAR declaracao_de_vars
                |
 ;
@@ -142,12 +129,12 @@ declaracao_de_vars: declaracao_de_vars declaracao_de_var
                   | declaracao_de_var
 
 declaracao_de_var: {
-                     num_carrega_tipo = 0;
-                     num_vars = 0;
+                     num_same_type = 0;
+                     current_num_vars = 0;
                   }
                   lista_idents DOIS_PONTOS tipo PONTO_E_VIRGULA {
-                     MEPA_WRITE(mepa_buf, "AMEM %d", num_vars);
-                     pilha_num_vars[++ponteiro_pilha_num_vars] = num_vars;
+                     MEPA_WRITE(mepa_buf, "AMEM %d", current_num_vars);
+                     mem_allocations[num_mem_allocations++] = current_num_vars;
 					   }
 
 ;
@@ -156,7 +143,7 @@ tipo        : TIPO {
                      const int type = 0 == strcmp(token, "integer") 
                                        ?  SYMBOLS_VARIABLES_INTEGER
                                        : strcmp(token, "boolean") ? SYMBOLS_VARIABLES_BOOLEAN : SYMBOLS_VARIABLES_UNDEFINED;
-                     symbols_table_add_type(tabela, type, num_carrega_tipo);
+                     symbols_table_add_type(table, type, num_same_type);
                      $$ = type;
             }
 ;
@@ -165,21 +152,21 @@ tipo        : TIPO {
 // =========== REGRA 10 ============= //
 lista_idents: lista_idents VIRGULA IDENT {
                LOG("Adding token [%s]\n", token);
-               s = symbols_table_create_symbol(token, SYMBOLS_TYPES_VARIABLE, nivel_lexico, cc, desloc_num_vars);
-               symbols_table_add(tabela, s);
-               ++num_carrega_tipo;
-               ++num_vars;
-               ++desloc_num_vars;
-               ++num_vars_por_nivel[nivel_lexico];
+               s = symbols_table_create_symbol(token, SYMBOLS_TYPES_VARIABLE, lexical_level, cc, current_offset);
+               symbols_table_add(table, s);
+               ++num_same_type;
+               ++current_num_vars;
+               ++current_offset;
+               ++num_vars_by_level[lexical_level];
             }
             | IDENT {
                LOG("Adding token [%s]\n", token);
-               s = symbols_table_create_symbol(token, SYMBOLS_TYPES_VARIABLE, nivel_lexico, cc, desloc_num_vars);
-               symbols_table_add(tabela, s);
-               ++num_carrega_tipo;
-               ++num_vars;
-               ++desloc_num_vars;
-               ++num_vars_por_nivel[nivel_lexico];
+               s = symbols_table_create_symbol(token, SYMBOLS_TYPES_VARIABLE, lexical_level, cc, current_offset);
+               symbols_table_add(table, s);
+               ++num_same_type;
+               ++current_num_vars;
+               ++current_offset;
+               ++num_vars_by_level[lexical_level];
             }
 ;
 
@@ -195,59 +182,58 @@ parte_declara_sub_rotinas:
 
 declara_procedimento:
                      PROCEDURE IDENT {
-                        strcpy(pilha_proc_name[pilha_proc++], token);
-                        num_params = 0;
+                        strcpy(function_names[num_function_names++], token);
+                        num_parameters = 0;
                      } parametros_formais_ou_nada {
                         label_a = genlabels_label_generate(p_labels);
-                        sprintf(mepa_buf, "ENPR %d", nivel_lexico);
+                        sprintf(mepa_buf, "ENPR %d", lexical_level);
                         geraCodigo(label_a.label, mepa_buf);
 
                         strcpy(content.proc.label, label_a.label);
-                        content.proc.n_params = num_params;
+                        content.proc.n_params = num_parameters;
                      
-                        memcpy(content.proc.params, lista_parametros, sizeof(struct symbols_parameter) * num_params);
+                        memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
                         
-                        symbols_table_set_offset(tabela, num_params);
-                        s = symbols_table_create_symbol(pilha_proc_name[pilha_proc - 1], SYMBOLS_TYPES_PROCEDURE, nivel_lexico, content, 0);
-                        symbols_table_add(tabela, s);
+                        symbols_table_set_offset(table, num_parameters);
+                        s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_PROCEDURE, lexical_level, content, 0);
+                        symbols_table_add(table, s);
 
-                     } PONTO_E_VIRGULA {symbols_table_print(tabela);} bloco {
-                           MEPA_WRITE(mepa_buf, "DMEM %d", pilha_num_vars[ponteiro_pilha_num_vars--]);
-                           MEPA_WRITE(mepa_buf, "RTPR %d, %d", nivel_lexico, num_params);
+                     } PONTO_E_VIRGULA {symbols_table_print(table);} bloco {
+                           MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[--num_mem_allocations]);
+                           MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
                            label_a = genlabels_label_get(p_labels);
-                           symbols_table_remove_until(tabela,pilha_proc_name[--pilha_proc]);
+                           symbols_table_remove_until(table,function_names[--num_function_names]);
                      } PONTO_E_VIRGULA
 ;
 
 parametros_formais_ou_nada:
-               ABRE_PARENTESES { num_params = 0; } declaracao_params FECHA_PARENTESES
+               ABRE_PARENTESES { num_parameters = 0; } declaracao_params FECHA_PARENTESES
                |
 ;
 
 declara_function:
                FUNCTION IDENT {
-                  strcpy(pilha_proc_name[pilha_proc++], token);
-                  num_params = 0;
+                  strcpy(function_names[num_function_names++], token);
+                  num_parameters = 0;
                } parametros_formais_ou_nada {
                   label_a = genlabels_label_generate(p_labels);
-                  sprintf(mepa_buf, "ENPR %d", nivel_lexico);
+                  sprintf(mepa_buf, "ENPR %d", lexical_level);
                   geraCodigo(label_a.label, mepa_buf);
 
                   strcpy(content.proc.label, label_a.label);
-                  content.proc.n_params = num_params;
+                  content.proc.n_params = num_parameters;
                
-                  memcpy(content.proc.params, lista_parametros, sizeof(struct symbols_parameter) * num_params);
-                  symbols_table_set_offset(tabela, num_params);
-                  s = symbols_table_create_symbol(pilha_proc_name[pilha_proc-1], SYMBOLS_TYPES_FUNCTION, nivel_lexico, content, -(4 + num_params));
-                  symbols_table_add(tabela, s);
+                  memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
+                  symbols_table_set_offset(table, num_parameters);
+                  s = symbols_table_create_symbol(function_names[num_function_names-1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
+                  symbols_table_add(table, s);
                } DOIS_PONTOS TIPO {
-                  symbols_table_add_type(tabela, SYMBOLS_VARIABLES_INTEGER, 1);
+                  symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
                } PONTO_E_VIRGULA bloco {
-                     MEPA_WRITE(mepa_buf, "DMEM %d", pilha_num_vars[ponteiro_pilha_num_vars]);
-                     --ponteiro_pilha_num_vars;
-                     MEPA_WRITE(mepa_buf, "RTPR %d, %d", nivel_lexico, num_params);
+                     MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[--num_mem_allocations]);
+                     MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
                      label_a = genlabels_label_get(p_labels);
-                     symbols_table_remove_until(tabela, pilha_proc_name[--pilha_proc]);
+                     symbols_table_remove_until(table, function_names[--num_function_names]);
                } PONTO_E_VIRGULA
 
 ; 
@@ -261,44 +247,44 @@ declaracao_params: declaracao_params PONTO_E_VIRGULA declaracao_param
 ;
 
 declaracao_param: {
-                     num_carrega_tipo = 0;
+                     num_same_type = 0;
                   }
                    lista_params_formais DOIS_PONTOS tipo {
-                     for(int i = num_params; i > num_params - num_carrega_tipo; --i) {
-                        lista_parametros[i-1].type = $4;
+                     for(int i = num_parameters; i > num_parameters - num_same_type; --i) {
+                        parameters[i-1].type = $4;
                      }
-                     ++num_carrega_tipo;
+                     ++num_same_type;
                    }
 
 ;
 
 lista_params_formais:   
-                        lista_params_formais VIRGULA parametro { ++num_params; }
-                        | parametro { ++num_params; }
+                        lista_params_formais VIRGULA parametro { ++num_parameters; }
+                        | parametro { ++num_parameters; }
 ;
 
 //=======================================================================
 parametro:
          VAR IDENT {
             cc.param.kind = param_aux.kind = SYMBOLS_PARAMETERS_REFERENCE;
-            lista_parametros[num_params] = param_aux;
+            parameters[num_parameters] = param_aux;
 
             printf("Adding token [%s]", token);
-            s = symbols_table_create_symbol(token, SYMBOLS_TYPES_PARAMETER, nivel_lexico, cc, -1);
-            symbols_table_add(tabela, s);
+            s = symbols_table_create_symbol(token, SYMBOLS_TYPES_PARAMETER, lexical_level, cc, -1);
+            symbols_table_add(table, s);
 
-            ++num_carrega_tipo;
+            ++num_same_type;
          } 
          |  IDENT {
             cc.param.kind = param_aux.kind = SYMBOLS_PARAMETERS_COPY;
-            lista_parametros[num_params] = param_aux;
+            parameters[num_parameters] = param_aux;
 
             LOG("Adding token [%s]", token);
-            s = symbols_table_create_symbol(token, SYMBOLS_TYPES_PARAMETER, nivel_lexico, cc, -1);
-            LOG("n_params = %d; offset = %d\n\n", num_params, s.offset);
-            symbols_table_add(tabela, s);
+            s = symbols_table_create_symbol(token, SYMBOLS_TYPES_PARAMETER, lexical_level, cc, -1);
+            LOG("n_params = %d; offset = %d\n\n", num_parameters, s.offset);
+            symbols_table_add(table, s);
 
-            ++num_carrega_tipo;
+            ++num_same_type;
          }
 ;
 
@@ -323,13 +309,13 @@ comando:
 // =========== REGRA 19 ============= //
 atribui_ou_func:
          IDENT {
-            esquerdo_func[esquerdo_recursao_func] = symbols_table_lookup(tabela, token);
-            ASSERT(esquerdo_func[esquerdo_recursao_func] != NULL, "Unknown token '%s'", token);
-            ++esquerdo_recursao_func;
-            LOG("Name = %s\n", esquerdo_func[esquerdo_recursao_func-1]->name);
+            nested_functions[num_nested_functions++] = symbols_table_lookup(table, token);
+            ASSERT(nested_functions[num_nested_functions - 1] != NULL, "Unknown token '%s'", token);
+            LOG("Name = %s\n", nested_functions[num_nested_functions-1]->name);
          }
-         continua_atibui_ou_func{
-            if ($3 == 1) --esquerdo_recursao_func;
+         continua_atibui_ou_func {
+            if ($3 == 1)
+               --num_nested_functions;
          }
 ;
 
@@ -341,7 +327,7 @@ continua_atibui_ou_func:
 
 atribui_contiunuacao: { LOG("ASSIGNMENT OP (continuation)"); }
                    expressao{
-                     const struct symbols_symbol *ret = esquerdo_func[esquerdo_recursao_func - 1];
+                     const struct symbols_symbol *ret = nested_functions[num_nested_functions - 1];
                      char const *command = NULL;
 
                      switch (ret->type) {
@@ -364,25 +350,24 @@ atribui_contiunuacao: { LOG("ASSIGNMENT OP (continuation)"); }
 // =========== REGRA 20 ============= //
 funcao_ou_ident:
                IDENT {
-                  esquerdo_func[esquerdo_recursao_func] = symbols_table_lookup(tabela, token);
-                  ASSERT(esquerdo_func[esquerdo_recursao_func] != NULL, "Couldn't find token '%s'", token);
-                  ++esquerdo_recursao_func;
+                  nested_functions[num_nested_functions++] = symbols_table_lookup(table, token);
+                  ASSERT(nested_functions[num_nested_functions - 1] != NULL, "Couldn't find token '%s'", token);
                   LOG("Name = %s; Type %d; Variable Type = %d",
-                      esquerdo_func[esquerdo_recursao_func - 1]->name,
-                      esquerdo_func[esquerdo_recursao_func - 1]->type,
-                      esquerdo_func[esquerdo_recursao_func - 1]->content.var_type);
+                      nested_functions[num_nested_functions - 1]->name,
+                      nested_functions[num_nested_functions - 1]->type,
+                      nested_functions[num_nested_functions - 1]->content.var_type);
                }
 
                parametros_ou_nada {
-                  const struct symbols_symbol *ret = esquerdo_func[esquerdo_recursao_func - 1];
+                  const struct symbols_symbol *ret = nested_functions[num_nested_functions - 1];
                   char const *command = NULL;
                   int return_type = -1;
 
-                  const struct symbols_symbol *func = esquerdo_func[esquerdo_recursao_func - 2];
-                  if (em_chamada_de_funcao && (func->content.proc.params[num_params].kind == SYMBOLS_PARAMETERS_REFERENCE)) {
+                  const struct symbols_symbol *func = nested_functions[num_nested_functions - 2];
+                  if (inside_function_call && (func->content.proc.params[num_parameters].kind == SYMBOLS_PARAMETERS_REFERENCE)) {
                      LOG("Entered a function call...\n"
                          "Token to be searched = '%s'; Params count = %d; Passing by reference = %d",
-                         func->name, num_params, func->content.proc.params[num_params].type);
+                         func->name, num_parameters, func->content.proc.params[num_parameters].type);
 
                      switch (ret->type) {
                      case SYMBOLS_TYPES_VARIABLE:
@@ -412,40 +397,40 @@ funcao_ou_ident:
                      MEPA_WRITE(mepa_buf, command, ret->lexical_level, ret->offset);
                      $$ = return_type;
                   }
-                  --esquerdo_recursao_func;
+                  --num_nested_functions;
                }
 ;
 
 parametros_ou_nada:
-                 empilha_retorno ABRE_PARENTESES {num_params = 0; em_chamada_de_funcao = 1;}lista_params {em_chamada_de_funcao = 0;} FECHA_PARENTESES {
-                  ASSERT(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION || esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PROCEDURE, "Not a function or procedure (%s)", esquerdo_func[esquerdo_recursao_func - 1]->name);
-                  ASSERT(esquerdo_func[esquerdo_recursao_func-1]->content.proc.n_params == num_params, "Wrong amount of parameters (%d vs %d)", esquerdo_func[esquerdo_recursao_func-1]->content.proc.n_params, num_params);
+                 empilha_retorno ABRE_PARENTESES {num_parameters = 0; inside_function_call = 1;} lista_params {inside_function_call = 0;} FECHA_PARENTESES {
+                  ASSERT(nested_functions[num_nested_functions-1]->type == SYMBOLS_TYPES_FUNCTION || nested_functions[num_nested_functions-1]->type == SYMBOLS_TYPES_PROCEDURE, "Not a function or procedure (%s)", nested_functions[num_nested_functions - 1]->name);
+                  ASSERT(nested_functions[num_nested_functions-1]->content.proc.n_params == num_parameters, "Wrong amount of parameters (%d vs %d)", nested_functions[num_nested_functions-1]->content.proc.n_params, num_parameters);
                   $$ = SYMBOLS_VARIABLES_UNDEFINED;
-                  MEPA_WRITE(mepa_buf, "CHPR %s, %d", esquerdo_func[esquerdo_recursao_func-1]->content.proc.label , nivel_lexico);
+                  MEPA_WRITE(mepa_buf, "CHPR %s, %d", nested_functions[num_nested_functions-1]->content.proc.label , lexical_level);
                 }
                 | empilha_retorno {
-                  if(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION || esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_PROCEDURE){
+                  if(nested_functions[num_nested_functions-1]->type == SYMBOLS_TYPES_FUNCTION || nested_functions[num_nested_functions-1]->type == SYMBOLS_TYPES_PROCEDURE){
                      $$ = SYMBOLS_VARIABLES_UNDEFINED; //caso seja procedure
-                     if(esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION){
+                     if(nested_functions[num_nested_functions-1]->type == SYMBOLS_TYPES_FUNCTION){
                         geraCodigo(NULL, "AMEM 1");
-                        $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
+                        $$ = nested_functions[num_nested_functions-1]->content.param.type;
                      }
-                     MEPA_WRITE(mepa_buf, "CHPR %s, %d", esquerdo_func[esquerdo_recursao_func-1]->content.proc.label , nivel_lexico);
+                     MEPA_WRITE(mepa_buf, "CHPR %s, %d", nested_functions[num_nested_functions-1]->content.proc.label , lexical_level);
                   }
                 }
 ;
 
 empilha_retorno:  {
-                     if (esquerdo_func[esquerdo_recursao_func-1]->type == SYMBOLS_TYPES_FUNCTION){
+                     if (nested_functions[num_nested_functions-1]->type == SYMBOLS_TYPES_FUNCTION){
                         geraCodigo(NULL, "AMEM 1");
-                        $$ = esquerdo_func[esquerdo_recursao_func-1]->content.param.type;
+                        $$ = nested_functions[num_nested_functions-1]->content.param.type;
                      }
                   }
 ;
 
 lista_params:  
-               lista_params VIRGULA expressao { ++num_params; }
-               | { LOG("%d", num_params); } expressao { ++num_params; }
+               lista_params VIRGULA expressao { ++num_parameters; }
+               | { LOG("%d", num_parameters); } expressao { ++num_parameters; }
 ;
 
 // =========== REGRA 22 ============= //
@@ -584,7 +569,7 @@ fator:
          MEPA_WRITE(mepa_buf, "CRCT %d", 0 == strcmp(token, "True"));
          $$ = SYMBOLS_VARIABLES_BOOLEAN;
       }
-      | ABRE_PARENTESES expressao_simples FECHA_PARENTESES{
+      | ABRE_PARENTESES expressao_simples FECHA_PARENTESES {
          $$ = $2;
       }
       | NOT fator {
@@ -610,7 +595,7 @@ parametro_leitura:
                   IDENT {
                      geraCodigo(NULL, "LEIT");
                      LOG("Searching token '%s' ...", token);
-                     ps = symbols_table_lookup(tabela, token);
+                     struct symbols_symbol *ps = symbols_table_lookup(table, token);
                      ASSERT(ps != NULL, "Couldn't find token '%s'", token);
                      MEPA_WRITE(mepa_buf, "ARMZ %d, %d", ps->lexical_level, ps->offset);
                   }
@@ -656,13 +641,13 @@ int main (int argc, const char **argv) {
    }
 
 /* -------------------------------------------------------------------
- *  Inicia a Tabela de S�mbolos
+ *  Inicia a table de S�mbolos
  * ------------------------------------------------------------------- */
 
    yyin = fp;
    yyparse();
 
-   symbols_table_print(tabela);
+   symbols_table_print(table);
 
    return EXIT_SUCCESS;
 }
