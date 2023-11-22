@@ -23,6 +23,7 @@ int num_same_type;
 struct symbols_content cc;
 struct symbols_table *table;
 struct symbols_symbol s;
+struct symbols_symbol *function_symbol;
 struct symbols_parameter parameters[128];
 int num_parameters;
 struct symbols_parameter param_aux;
@@ -71,6 +72,9 @@ int inside_function_call = 0;
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
 
+%nonassoc PONTO_E_VIRGULA
+%nonassoc SEM_PONTO_E_VIRGULA
+
 %%
 
 
@@ -96,6 +100,7 @@ programa    :{
 
 
 input_idents: IDENT VIRGULA IDENT
+   | IDENT
 ;
 
 // =========== REGRA 2 ============= //
@@ -108,6 +113,7 @@ bloco       :
             }
             parte_declara_sub_rotinas {
                --lexical_level;
+               genlabels_print(p_labels);
                label_a = genlabels_label_get(p_labels);
                geraCodigo (label_a.label, "NADA");
             }
@@ -184,28 +190,8 @@ declara_procedimento:
                      PROCEDURE IDENT {
                         strcpy(function_names[num_function_names++], token);
                         num_parameters = 0;
-                     } parametros_formais_ou_nada {
-                        label_a = genlabels_label_generate(p_labels);
-                        sprintf(mepa_buf, "ENPR %d", lexical_level);
-                        geraCodigo(label_a.label, mepa_buf);
-
-                        strcpy(content.proc.label, label_a.label);
-                        content.proc.n_params = num_parameters;
-                     
-                        memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
-                        
-                        symbols_table_set_offset(table, num_parameters);
-                        s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_PROCEDURE, lexical_level, content, 0);
-                        symbols_table_add(table, s);
-
-                     } PONTO_E_VIRGULA {symbols_table_print(table);} bloco {
-                           MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[--num_mem_allocations]);
-                           MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
-                           label_a = genlabels_label_get(p_labels);
-                           symbols_table_remove_until(table,function_names[--num_function_names]);
-                     } PONTO_E_VIRGULA
+                     } parametros_formais_ou_nada PONTO_E_VIRGULA bloco_ou_forward_proc PONTO_E_VIRGULA
 ;
-
 parametros_formais_ou_nada:
                ABRE_PARENTESES { num_parameters = 0; } declaracao_params FECHA_PARENTESES
                |
@@ -216,18 +202,18 @@ declara_function:
                   strcpy(function_names[num_function_names++], token);
                   num_parameters = 0;
                } parametros_formais_ou_nada DOIS_PONTOS TIPO PONTO_E_VIRGULA {
-                  label_a = genlabels_label_generate(p_labels);
-                  sprintf(mepa_buf, "ENPR %d", lexical_level);
-                  geraCodigo(label_a.label, mepa_buf);
+                  //label_a = genlabels_label_generate(p_labels);
+                  //sprintf(mepa_buf, "ENPR %d", lexical_level);
+                  //geraCodigo(label_a.label, mepa_buf);
 
-                  strcpy(content.proc.label, label_a.label);
-                  content.proc.n_params = num_parameters;
+                  //strcpy(content.proc.label, label_a.label);
+                  //content.proc.n_params = num_parameters;
                
-                  memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
-                  symbols_table_set_offset(table, num_parameters);
-                  s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
-                  symbols_table_add(table, s);
-                  symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
+                  //memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
+                  //symbols_table_set_offset(table, num_parameters);
+                  //s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
+                  //symbols_table_add(table, s);
+                  //symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
                } bloco_ou_forward PONTO_E_VIRGULA
 ; 
 
@@ -342,10 +328,12 @@ funcao_ou_ident:
                IDENT {
                   nested_functions[num_nested_functions++] = symbols_table_lookup(table, token);
                   ASSERT(nested_functions[num_nested_functions - 1] != NULL, "Couldn't find token '%s'", token);
-                  LOG("Name = %s; Type %d; Variable Type = %d",
+                  LOG("Name = %s; Type %d; Variable Type = %d; Offset = %d",
                       nested_functions[num_nested_functions - 1]->name,
                       nested_functions[num_nested_functions - 1]->type,
-                      nested_functions[num_nested_functions - 1]->content.var_type);
+                      nested_functions[num_nested_functions - 1]->content.var_type,
+                      nested_functions[num_nested_functions - 1]->offset);
+                  symbols_table_print(table);
                }
 
                parametros_ou_nada {
@@ -382,6 +370,9 @@ funcao_ou_ident:
                      }
                   }
                   LOG("Type is %d", ret->type);
+
+                  LOG("RET= %s offset = %d command = '%s'", ret->name, ret->offset, command);
+                  symbols_table_print(table);
 
                   if (return_type != -1) {
                      MEPA_WRITE(mepa_buf, command, ret->lexical_level, ret->offset);
@@ -526,13 +517,159 @@ expressao_simples:
                }
 ;
 
-bloco_ou_forward:
-      FORWARD { }
-      | bloco {
-         MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[--num_mem_allocations]);
+bloco_ou_forward_proc: 
+      FORWARD {
+         LOG("forward num parameters: %d", num_parameters);
+         symbols_table_print(table);
+         content.proc.n_params = num_parameters;
+         memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
+         symbols_table_set_offset(table, num_parameters);
+         symbols_table_print(table);
+
+         label_a = genlabels_label_generate(p_labels);
+         strcpy(content.proc.label, label_a.label);
+         label_a = genlabels_label_generate(p_labels);
+         strcpy(content.proc.forwarded_label, label_a.label);
+         symbols_table_pop_n(table, num_parameters);
+
+         s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_PROCEDURE, lexical_level, content, -(4 + num_parameters));
+
+         symbols_table_add(table, s);
+         symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
+
+         sprintf(mepa_buf, "DSVS %s", s.content.proc.forwarded_label);
+         geraCodigo(s.content.proc.label, mepa_buf);
+      }
+      | 
+      {
+         if (function_symbol = symbols_table_lookup(table, function_names[num_function_names - 1])) {
+            // já foi declarada
+            LOG("already forwarded");
+            symbols_table_print(table);
+            symbols_table_set_offset(table, num_parameters);
+            ASSERT(function_symbol->content.proc.forwarded_label, "Duplicate declaration");
+            sprintf(mepa_buf, "ENPR %d", lexical_level);
+            geraCodigo(function_symbol->content.proc.forwarded_label, mepa_buf);
+            label_a = genlabels_label_get(p_labels);
+            //symbols_table_remove_until(table, function_names[num_function_names - 1]);
+         } else {
+            LOG("wasnt forwarded: %s", function_names[num_function_names - 1]);
+            symbols_table_print(table);
+            ASSERT(function_symbol->content.proc.forwarded_label, "Duplicate declaration");
+            label_a = genlabels_label_generate(p_labels);
+            sprintf(mepa_buf, "ENPR %d", lexical_level);
+            geraCodigo(label_a.label, mepa_buf);
+
+            strcpy(content.proc.label, label_a.label);
+            content.proc.n_params = num_parameters;
+            content.proc.forwarded_label[0] = '\0';
+         
+            memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
+            symbols_table_set_offset(table, num_parameters);
+            s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_PROCEDURE, lexical_level, content, 0);
+            symbols_table_add(table, s);
+            function_symbol = &table->symbols[table->top];
+            symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
+         }
+         //if (function_symbol = symbols_table_lookup(table, function_names[num_function_names - 1])) {
+         //   label_a = genlabels_label_get(p_labels);
+         //}
+      } bloco {
+         MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[num_mem_allocations - 1]);
          MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
          label_a = genlabels_label_get(p_labels);
-         symbols_table_remove_until(table, function_names[--num_function_names]);
+         LOG("FIM DE BLOCO OU FORWARD COMO BLOCO");
+         symbols_table_print(table);
+
+         function_symbol = symbols_table_lookup(table, function_names[num_function_names - 1]);
+         ASSERT(function_symbol, "Did not find symbol");
+         if (*function_symbol->content.proc.forwarded_label)
+            symbols_table_pop_n(table, mem_allocations[num_mem_allocations - 1] + num_parameters);
+         else {
+            symbols_table_remove_until(table, function_names[num_function_names - 1]);
+         }
+         --num_mem_allocations;
+         --num_function_names;
+
+         symbols_table_print(table);
+      }
+;
+
+bloco_ou_forward:
+      FORWARD {
+         LOG("forward num parameters: %d", num_parameters);
+         symbols_table_print(table);
+         content.proc.n_params = num_parameters;
+         memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
+         symbols_table_set_offset(table, num_parameters);
+         symbols_table_print(table);
+
+         label_a = genlabels_label_generate(p_labels);
+         strcpy(content.proc.label, label_a.label);
+         label_a = genlabels_label_generate(p_labels);
+         strcpy(content.proc.forwarded_label, label_a.label);
+         symbols_table_pop_n(table, num_parameters);
+
+         s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
+
+         symbols_table_add(table, s);
+         symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
+
+         sprintf(mepa_buf, "DSVS %s", s.content.proc.forwarded_label);
+         geraCodigo(s.content.proc.label, mepa_buf);
+      }
+      |
+      {
+         if (function_symbol = symbols_table_lookup(table, function_names[num_function_names - 1])) {
+            // já foi declarada
+            LOG("already forwarded");
+            symbols_table_print(table);
+            symbols_table_set_offset(table, num_parameters);
+            ASSERT(function_symbol->content.proc.forwarded_label, "Duplicate declaration");
+            sprintf(mepa_buf, "ENPR %d", lexical_level);
+            geraCodigo(function_symbol->content.proc.forwarded_label, mepa_buf);
+            label_a = genlabels_label_get(p_labels);
+            //symbols_table_remove_until(table, function_names[num_function_names - 1]);
+         } else {
+            LOG("wasnt forwarded: %s", function_names[num_function_names - 1]);
+            symbols_table_print(table);
+            ASSERT(function_symbol->content.proc.forwarded_label, "Duplicate declaration");
+            label_a = genlabels_label_generate(p_labels);
+            sprintf(mepa_buf, "ENPR %d", lexical_level);
+            geraCodigo(label_a.label, mepa_buf);
+
+            strcpy(content.proc.label, label_a.label);
+            content.proc.n_params = num_parameters;
+            content.proc.forwarded_label[0] = '\0';
+         
+            memcpy(content.proc.params, parameters, sizeof(struct symbols_parameter) * num_parameters);
+            symbols_table_set_offset(table, num_parameters);
+            s = symbols_table_create_symbol(function_names[num_function_names - 1], SYMBOLS_TYPES_FUNCTION, lexical_level, content, -(4 + num_parameters));
+            symbols_table_add(table, s);
+            function_symbol = &table->symbols[table->top];
+            symbols_table_add_type(table, SYMBOLS_VARIABLES_INTEGER, 1);
+         }
+         //if (function_symbol = symbols_table_lookup(table, function_names[num_function_names - 1])) {
+         //   label_a = genlabels_label_get(p_labels);
+         //}
+      } bloco {
+         MEPA_WRITE(mepa_buf, "DMEM %d", mem_allocations[num_mem_allocations - 1]);
+         MEPA_WRITE(mepa_buf, "RTPR %d, %d", lexical_level, num_parameters);
+         label_a = genlabels_label_get(p_labels);
+         LOG("FIM DE BLOCO OU FORWARD COMO BLOCO");
+         symbols_table_print(table);
+
+         function_symbol = symbols_table_lookup(table, function_names[num_function_names - 1]);
+         ASSERT(function_symbol, "Did not find symbol");
+         if (*function_symbol->content.proc.forwarded_label)
+            symbols_table_pop_n(table, mem_allocations[num_mem_allocations - 1] + num_parameters);
+         else {
+            symbols_table_remove_until(table, function_names[num_function_names - 1]);
+         }
+         --num_mem_allocations;
+         --num_function_names;
+
+         symbols_table_print(table);
       }
 ;
 

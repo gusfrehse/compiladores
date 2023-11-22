@@ -5,16 +5,16 @@ var
 
 function max(num1, num2: integer): integer; forward;
 
-function min(num1, num2: integer): integer;
+function min(bnum1, bnum2: integer): integer;
 var
-   result: integer;
+   bresult: integer;
 
 begin
-   if (num1 > num2) then
-      result := num2
+   if bnum1 > bnum2 then
+      bresult := bnum2
    else
-      result := num1;
-   min := result;
+      bresult := bnum1;
+   min := bresult
 end;
 
 
@@ -23,14 +23,16 @@ var
    result: integer;
 
 begin
-   if (num1 > num2) then
+   if num1 > num2 then
       result := num1
    else
       result := num2;
-   max := result;
+   max := result
 end;
 
 begin
   res := max(5,10);
   writeln(res);
+  res := min(1, 2);
+  writeln(res)
 end.

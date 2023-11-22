@@ -17,9 +17,15 @@
 
 3. Quais os maiores problemas para fazer funcionar
 
-    O maior problema encontrado foi relacionado à organização dos labels.
+    O maior problema encontrado foi relacionado à organização dos labels e
+    símbolos.
+    
     A introdução de duas labels para uma mesma função exigiu uma lógica
     cuidadosa para garantir que a implementação fosse eficiente e não
-    introduzisse complexidade desnecessária. A gestão adequada das labels
-    e sua interação com as declarações e definições representou um desafio
-    durante a implementação.
+    introduzisse complexidade desnecessária. 
+
+    A organização dos símbolos na pilha de símbolos foi um ponto delicado, já
+    que em nossa implementação era assumido que o símbolo da função sempre
+    ficava entre os parâmetros e as variáveis locais. Isso não ocorre quando há
+    fowarding, já que o símbolo da função fica bem antes dos parâmetros e das
+    variáveis locais.

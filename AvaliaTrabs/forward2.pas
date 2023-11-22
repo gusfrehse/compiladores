@@ -1,18 +1,18 @@
 Program OutputLines(output);
 
-procedure fun1() ; forward;
+procedure fun1 ; forward;
 
-procedure fun2();
+procedure fun2;
 begin
     write(0);
-    fun1();
+    fun1
 end;
 
-procedure fun1();
+procedure fun1;
 begin
-   write(1);
+   write(1)
 end;
 
 begin
-    fun2();
+    fun2
 end.

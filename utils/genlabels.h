@@ -20,4 +20,6 @@ struct genlabels_label genlabels_label_get(struct genlabels_table *table);
 
 void genlabels_table_pop_n(struct genlabels_table *table, int n);
 
+void genlabels_print(struct genlabels_table *table);
+
 #endif /* !GENLABELS_H */

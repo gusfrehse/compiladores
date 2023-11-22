@@ -1,17 +1,19 @@
-Program Maximum_Minimum_Number(output);
-var
-   res : integer;
+Program OutputLines(output);
 
-function teste(num1, num2: integer): integer; forward;
+function fun1 : integer ; forward;
 
-function teste(num1, num2: integer): integer;
-var
-   result: integer;
+function fun2 : integer;
 begin
-   teste := 3
+    write(0);
+    fun1
+end;
+
+function fun1 : integer;
+begin
+   write(1)
 end;
 
 begin
-  res := teste(5,10);
-  writeln(res);
+    fun2
 end.
+

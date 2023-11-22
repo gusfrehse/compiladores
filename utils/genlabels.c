@@ -28,3 +28,13 @@ genlabels_table_pop_n(struct genlabels_table *table, int n)
 {
     table->top -= n;
 }
+
+void
+genlabels_print(struct genlabels_table *table)
+{
+    printf("simbolos: ");
+    for (int i = 0; i < table->top; i++)
+        printf("'%s'; ", table->labels[i].label);
+
+    printf("\n");
+}

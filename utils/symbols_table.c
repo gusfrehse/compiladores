@@ -70,10 +70,11 @@ symbols_table_print(struct symbols_table *table)
         if (table->symbols[i].type == SYMBOLS_TYPES_PROCEDURE
             || table->symbols[i].type == SYMBOLS_TYPES_FUNCTION)
         {
-            printf("Simbolo %i: token = %s || nivel = %i || rotulo = '%s' || forwarded_label = '%s' ", i,
+            printf("Simbolo %i: token = %s || nivel = %i || rotulo = '%s' || forwarded_label = '%s' || offset = %d ", i,
                    table->symbols[i].name, table->symbols[i].lexical_level,
                    table->symbols[i].content.proc.label,
-                   table->symbols[i].content.proc.forwarded_label);
+                   table->symbols[i].content.proc.forwarded_label,
+                   table->symbols[i].offset);
 
             for (int j = 0; j < table->symbols[i].content.proc.n_params; j++) {
                 printf("\tP%i[T: %i|PASS: %i] ", j,
@@ -83,7 +84,7 @@ symbols_table_print(struct symbols_table *table)
             printf("\n");
         }
         else {
-            printf("Simbolo %i: token = %s || nivel = %i || desloc = %i \n", i,
+            printf("Simbolo %i: token = %s || nivel = %i || offset = %i \n", i,
                    table->symbols[i].name, table->symbols[i].lexical_level,
                    table->symbols[i].offset);
         }
@@ -95,9 +96,8 @@ symbols_table_remove_until(struct symbols_table *table, const char *name)
 {
     printf("removendo func/proc %s\n", name);
     struct symbols_symbol *sym = NULL;
-    int i;
 
-    for (i = table->top - 1; i >= 0; i--) {
+    for (int i = table->top - 1; i >= 0; --i) {
         if (0 == strcmp(table->symbols[i].name, name)
             && (table->symbols[i].type == SYMBOLS_TYPES_PROCEDURE
                 || table->symbols[i].type == SYMBOLS_TYPES_FUNCTION))
@@ -107,12 +107,17 @@ symbols_table_remove_until(struct symbols_table *table, const char *name)
             break;
         }
 
+        printf("Removing %s\n", table->symbols[i].name);
+
         symbols_table_print(table);
         --table->top;
     }
 
-    for (--i; i >= 0; i--) {
+    for (int i = table->top - 1; i >= 0; --i) {
         if (table->symbols[i].offset >= 0) break;
+        //if (table->symbols[i].type == SYMBOLS_TYPES_FUNCTION || table->symbols[i].type == SYMBOLS_TYPES_PROCEDURE)
+        //    break;
+        if (*table->symbols[i].content.proc.forwarded_label) break;
 
         --table->top;
         symbols_table_print(table);
